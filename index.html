@@ -1,0 +1,101 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OSRS Single‑File Tracker</title>
+<style>
+body{background:#0b1220;color:#e5e7eb;font-family:-apple-system,system-ui;margin:0;padding:16px}
+h1{margin:0 0 12px}
+.card{background:#020617;border:1px solid #1e293b;border-radius:14px;padding:14px;margin-bottom:12px}
+input,button{padding:10px;border-radius:10px;border:1px solid #334155;background:#020617;color:#e5e7eb}
+button{background:#14b8a6;color:#022c22;font-weight:700}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+li{margin:6px 0}
+.small{opacity:.7;font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>OSRS Price Tracker</h1>
+
+<div class="card">
+  <div class="row">
+    <input id="name" placeholder="Item name (optional)">
+    <input id="id" placeholder="Item ID (e.g. 4151)">
+    <button onclick="addItem()">Add</button>
+  </div>
+  <div class="row">
+    <button onclick="loadMapping()">Load mapping</button>
+    <button onclick="refreshPrices()">Refresh prices</button>
+  </div>
+</div>
+
+<div class="card">
+  <ul id="list"></ul>
+  <button onclick="clearAll()">Clear</button>
+</div>
+
+<script>
+let MAP = null;
+
+function loadList(){
+  const ul=document.getElementById("list");
+  ul.innerHTML="";
+  const items=JSON.parse(localStorage.getItem("items")||"[]");
+  items.forEach(i=>{
+    const li=document.createElement("li");
+    li.innerHTML=`<b>${i.name||i.id}</b> (${i.id})
+      <div class="small">Price: ${i.price?i.price.toLocaleString():"—"} gp</div>`;
+    ul.appendChild(li);
+  });
+}
+
+async function loadMapping(){
+  if(MAP) return alert("Mapping already loaded");
+  const r=await fetch("https://prices.runescape.wiki/api/v1/osrs/mapping");
+  MAP=await r.json();
+  localStorage.setItem("map",JSON.stringify(MAP));
+  alert("Mapping loaded");
+}
+
+function addItem(){
+  let name=document.getElementById("name").value.trim();
+  let id=document.getElementById("id").value.trim();
+
+  if(!id && MAP){
+    const f=MAP.find(x=>x.name.toLowerCase()===name.toLowerCase());
+    if(f) id=f.id;
+  }
+  if(!id) return alert("Need item ID or mapping");
+
+  const arr=JSON.parse(localStorage.getItem("items")||"[]");
+  arr.push({name:name||id,id:id});
+  localStorage.setItem("items",JSON.stringify(arr));
+  loadList();
+}
+
+async function refreshPrices(){
+  const arr=JSON.parse(localStorage.getItem("items")||"[]");
+  for(const it of arr){
+    const r=await fetch(`https://prices.runescape.wiki/api/v1/osrs/latest?id=${it.id}`);
+    const d=(await r.json()).data[it.id];
+    it.price=d.high;
+  }
+  localStorage.setItem("items",JSON.stringify(arr));
+  loadList();
+}
+
+function clearAll(){
+  localStorage.removeItem("items");
+  loadList();
+}
+
+const cached=localStorage.getItem("map");
+if(cached) MAP=JSON.parse(cached);
+loadList();
+</script>
+
+</body>
+</html>
